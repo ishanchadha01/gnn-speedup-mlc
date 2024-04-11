@@ -1,0 +1,39 @@
+name: mlc-gnn
+channels:
+  - defaults
+dependencies:
+  - bzip2=1.0.8=h6c40b1e_5
+  - ca-certificates=2024.3.11=hecd8cb5_0
+  - libffi=3.4.4=hecd8cb5_0
+  - ncurses=6.4=hcec6c5f_0
+  - openssl=3.0.13=hca72f7f_0
+  - pip=23.3.1=py310hecd8cb5_0
+  - python=3.10.14=h5ee71fb_0
+  - readline=8.2=hca72f7f_0
+  - setuptools=68.2.2=py310hecd8cb5_0
+  - sqlite=3.41.2=h6c40b1e_0
+  - tk=8.6.12=h5d9f67b_0
+  - wheel=0.41.2=py310hecd8cb5_0
+  - xz=5.4.6=h6c40b1e_0
+  - zlib=1.2.13=h4dc903c_0
+  - pip:
+      - filelock==3.13.4
+      - fsspec==2024.3.1
+      - jinja2==3.1.3
+      - markupsafe==2.1.5
+      - mordred==1.2.0
+      - mpmath==1.3.0
+      - networkx==2.8.8
+      - numpy==1.26.4
+      - pandas==2.2.1
+      - pillow==10.3.0
+      - python-dateutil==2.9.0.post0
+      - pytz==2024.1
+      - rdkit-pypi==2022.9.5
+      - six==1.16.0
+      - sympy==1.12
+      - torch==2.2.2
+      - tqdm==4.66.2
+      - typing-extensions==4.11.0
+      - tzdata==2024.1
+prefix: /Users/ishan/anaconda3/envs/mlc-gnn
