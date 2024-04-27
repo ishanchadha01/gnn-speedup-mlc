@@ -1,0 +1,3 @@
+[submodule "reaction_yield_pretrained_gnn_test"]
+	path = reaction_yield_pretrained_gnn_test
+	url = https://github.com/hjm9702/reaction_yield_pretrained_gnn.git
