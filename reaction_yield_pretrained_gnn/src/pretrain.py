@@ -12,6 +12,12 @@ from src.model import GIN, linear_head
 from src.util import collate_graphs_pretraining
 
 
+from .core import Masking, CosineDecay, LinearDecay, LinearDecayTheta, CosineDecayTheta
+
+device = 'cpu'
+if torch.cuda.is_available():
+    device = 'cuda'
+
 def pretrain(args):
     pretraining_dataset = Pretraining_Dataset(
         args.pretrain_graph_save_path, args.pretrain_mordred_save_path, args.pca_dim
@@ -25,16 +31,34 @@ def pretrain(args):
         drop_last=True,
     )
 
+    
+
     node_dim = pretraining_dataset.node_attr.shape[1]
     edge_dim = pretraining_dataset.edge_attr.shape[1]
     mordred_dim = pretraining_dataset.mordred.shape[1]
 
-    g_encoder = GIN(node_dim, edge_dim).cuda()
-    m_predictor = linear_head(in_feats=1024, out_feats=mordred_dim).cuda()
+    g_encoder = GIN(node_dim, edge_dim).to(device)
+    m_predictor = linear_head(in_feats=1024, out_feats=mordred_dim).to(device)
+
+    optimizer = Adam(g_encoder.parameters(),lr=args.lr,weight_decay=args.l2)
+    mask = None
+    # args.sparse = False
+    if args.sparse:
+        decay = CosineDecay(args.death_rate, len(train_loader)*(args.epochs*args.multiplier))
+        print("length of train_loader: ", len(train_loader))
+        decay_theta = LinearDecayTheta(args.theta, args.factor, args.theta_decay_freq)
+        # decay_theta = CosineDecayTheta(args.theta, len(train_loader)*(args.epochs*args.multiplier))
+        # print("args.theta_min: ", args.theta_min)
+        mask = Masking(optimizer, death_rate=args.death_rate, death_mode=args.death, death_rate_decay=decay, theta_decay=decay_theta, growth_mode=args.growth,
+                        redistribution_mode=args.redistribution, theta=args.theta, epsilon=args.epsilon, args=args)
+        mask.add_module(g_encoder, sparse_init=args.sparse_init, density=args.density)
+
 
     pc_eigenvalue = pretraining_dataset.pc_eigenvalue
 
-    pretrain_moldescpred(g_encoder, m_predictor, train_loader, pc_eigenvalue, args.seed)
+    
+
+    pretrain_moldescpred(g_encoder, m_predictor, train_loader, pc_eigenvalue, args.seed, mask)
 
 
 def pretrain_moldescpred(
@@ -43,6 +67,7 @@ def pretrain_moldescpred(
     trn_loader,
     pc_eigenvalue,
     seed,
+    mask,
     cuda=torch.device("cuda:0"),
 ):
     max_epochs = 10
@@ -55,7 +80,7 @@ def pretrain_moldescpred(
         weight_decay=1e-5,
     )
 
-    pc_eigenvalue = torch.from_numpy(pc_eigenvalue).to(cuda)
+    pc_eigenvalue = torch.from_numpy(pc_eigenvalue).to(device)
 
     def weighted_mse_loss(input, target, weight):
         return (weight * ((input - target) ** 2)).mean()
@@ -69,6 +94,15 @@ def pretrain_moldescpred(
         g_encoder.train()
         m_predictor.train()
 
+        # # model.train()
+        # optimizer.zero_grad()
+        # out = model(data.x, data.edge_index, data.edge_weight)
+        # loss = F.cross_entropy(out[data.train_mask], data.y[data.train_mask])
+        # loss.backward()
+        # # optimizer.step()
+        # if mask is not None: mask.step()
+        # else: optimizer.step()
+
         start_time = time.time()
 
         trn_loss_list = []
@@ -78,9 +112,9 @@ def pretrain_moldescpred(
         ):
             inputs, n_nodes, mordred = batchdata
 
-            inputs = inputs.to(cuda)
+            inputs = inputs.to(device)
 
-            mordred = mordred.to(cuda)
+            mordred = mordred.to(device)
 
             g_rep = g_encoder(inputs)
             m_pred = m_predictor(g_rep)
@@ -89,7 +123,15 @@ def pretrain_moldescpred(
 
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            # optimizer.step()
+
+
+            if mask is not None: 
+                mask.step()
+                # print('hi')
+            else: 
+                optimizer.step()
+                # print('bye')
 
             train_loss = loss.detach().item()
             trn_loss_list.append(train_loss)

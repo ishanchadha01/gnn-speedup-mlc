@@ -102,7 +102,7 @@ class Masking(object):
         device = 'cpu'
         if torch.cuda.is_available():
             device = 'cuda'
-        self.device = torch.device(device)
+        self.device = device
         self.growth_mode = growth_mode
         self.death_mode = death_mode
         self.growth_death_ratio = growth_death_ratio
