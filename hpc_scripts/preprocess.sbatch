@@ -4,7 +4,7 @@
 #SBATCH -N 8 --ntasks-per-node 8                             # Number of nodes and cores per node required
 #SBATCH -t720                                                   # Duration of the job (Ex: 15 mins)
 #SBATCH -qinferno                                               # QOS Name
-#SBATCH -o preprocess_mlc_gnn.out                                   # Combined output and error messages file
+#SBATCH -o preprocess_mlc_gnn_10m.out                                   # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL                              # Mail preferences
 #SBATCH --mail-user=ichadha3@gatech.edu                         # E-mail address for notifications
 
@@ -14,4 +14,5 @@ module load anaconda3
 module load gcc
 
 conda activate mlc
-python3 process_data.py
+python --version
+python process_data.py

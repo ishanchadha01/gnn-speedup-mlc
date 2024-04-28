@@ -16,7 +16,25 @@ rdBase.DisableLog("rdApp.warning")
 warnings.filterwarnings("ignore")
 
 
-def preprocess(molsuppl, graph_save_path=""):
+def preprocess_mol(mol):
+    try:
+        Chem.SanitizeMol(mol)
+        si = Chem.FindPotentialStereo(mol)
+        for element in si:
+            if (str(element.type) == "Atom_Tetrahedral" and str(element.specified) == "Specified"):
+                mol.GetAtomWithIdx(element.centeredOn).SetProp("Chirality", str(element.descriptor))
+            elif (str(element.type) == "Bond_Double" and str(element.specified) == "Specified"):
+                mol.GetBondWithIdx(element.centeredOn).SetProp("Stereochemistry", str(element.descriptor))
+        
+        assert "." not in Chem.MolToSmiles(mol)
+    except:
+        return None
+    
+    mol = Chem.RemoveHs(mol)
+    return mol
+
+
+def preprocess(molsuppl, graph_save_path="../../data", num_processes=32):
     length = len(molsuppl)
 
     mol_dict = {
@@ -29,35 +47,41 @@ def preprocess(molsuppl, graph_save_path=""):
     }
 
     print("Creating molecule dict")
-    for i, mol in tqdm(enumerate(molsuppl)):
+    
+
+    # for i, mol in tqdm(enumerate(molsuppl)):
  
-        try:
-            Chem.SanitizeMol(mol)
-            si = Chem.FindPotentialStereo(mol)
-            for element in si:
-                if (
-                    str(element.type) == "Atom_Tetrahedral"
-                    and str(element.specified) == "Specified"
-                ):
-                    mol.GetAtomWithIdx(element.centeredOn).SetProp(
-                        "Chirality", str(element.descriptor)
-                    )
-                elif (
-                    str(element.type) == "Bond_Double"
-                    and str(element.specified) == "Specified"
-                ):
-                    mol.GetBondWithIdx(element.centeredOn).SetProp(
-                        "Stereochemistry", str(element.descriptor)
-                    )
-            assert "." not in Chem.MolToSmiles(mol)
-        except:
-            continue
+    #     try:
+    #         Chem.SanitizeMol(mol)
+    #         si = Chem.FindPotentialStereo(mol)
+    #         for element in si:
+    #             if (
+    #                 str(element.type) == "Atom_Tetrahedral"
+    #                 and str(element.specified) == "Specified"
+    #             ):
+    #                 mol.GetAtomWithIdx(element.centeredOn).SetProp(
+    #                     "Chirality", str(element.descriptor)
+    #                 )
+    #             elif (
+    #                 str(element.type) == "Bond_Double"
+    #                 and str(element.specified) == "Specified"
+    #             ):
+    #                 mol.GetBondWithIdx(element.centeredOn).SetProp(
+    #                     "Stereochemistry", str(element.descriptor)
+    #                 )
+    #         assert "." not in Chem.MolToSmiles(mol)
+    #     except:
+    #         continue
 
-        mol = Chem.RemoveHs(mol)
+    #     mol = Chem.RemoveHs(mol)
+    #     mol_dict = add_mol(mol_dict, mol)
+
+    with Pool(num_processes) as pool:
+        results = list(tqdm(pool.imap(preprocess_mol, molsuppl), total=len(molsuppl)))
+
+    mol_dict = {}
+    for mol in filter(None, results):  # Filter out None results (failed molecules)
         mol_dict = add_mol(mol_dict, mol)
-
-        if (i + 1) % 10000 == 0:
-            print(f"{i+1}/{length} processed")
 
     mol_dict["n_node"] = np.array(mol_dict["n_node"]).astype(int)
     mol_dict["n_edge"] = np.array(mol_dict["n_edge"]).astype(int)
@@ -69,7 +93,7 @@ def preprocess(molsuppl, graph_save_path=""):
     for key in mol_dict.keys():
         print(key, mol_dict[key].shape, mol_dict[key].dtype)
 
-    with open(graph_save_path + "pubchem_graph.npz", "wb") as f:
+    with open(os.path.join(graph_save_path, "pubchem_graph.npz"), "wb") as f:
         pickle.dump([mol_dict], f, protocol=5)
 
 
@@ -98,7 +122,7 @@ def get_mordred_mol(mol):
         return None
 
 
-def get_mordred(molsuppl, mordred_save_path="", num_processes=32):
+def get_mordred(molsuppl, mordred_save_path="../../data", num_processes=32):
     
     calc = Calculator(descriptors, ignore_3D=True)
 
@@ -118,7 +142,7 @@ def get_mordred(molsuppl, mordred_save_path="", num_processes=32):
     mordred_list = calc.pandas(mol_list).fill_missing(np.nan).to_numpy(dtype=float)
 
     with open(
-        mordred_save_path + "pubchem_mordred.npz",
+        os.path.join(mordred_save_path, "pubchem_mordred.npz"),
         "wb",
     ) as f:
         pickle.dump([mordred_list], f, protocol=5)
@@ -136,11 +160,11 @@ if __name__ == "__main__":
     # The full dataset (10M mols collected from Pubchem) can be downloaded from
     # https://arxiv.org/pdf/2010.09885.pdf
     molsuppl = Chem.SmilesMolSupplier(
-        "pubchem-10k.txt", delimiter=","
+        "../../data/pubchem-10m.txt", delimiter=","
     )
 
-    if not os.path.exists("pubchem_graph.npz"):
+    if not os.path.exists("../../data/pubchem_graph.npz"):
         preprocess(molsuppl)
 
-    if not os.path.exists("pubchem_mordred.npz"):
+    if not os.path.exists("../../datapubchem_mordred.npz"):
         get_mordred(molsuppl)
