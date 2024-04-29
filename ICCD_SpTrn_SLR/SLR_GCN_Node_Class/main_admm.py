@@ -14,7 +14,10 @@ import torch_geometric.transforms as T
 from torch_geometric.datasets import Planetoid
 from torch_geometric.logging import init_wandb, log
 from torch_geometric.nn import GCNConv
-import utils 
+import utils
+
+from model import GIN, linear_head, Pretraining_Dataset
+import numpy as np
 
 # Parse arguments
 args = utils.parse_args_admm()
@@ -48,20 +51,20 @@ init_wandb(name=f'GCN-{args.dataset}', lr=args.lr, epochs=args.epochs,
 
 
 
-class GCN(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels):
-        super().__init__()
-        self.conv1 = GCNConv(in_channels, hidden_channels, cached=True,
-                             normalize=not args.use_gdc)
-        self.conv2 = GCNConv(hidden_channels, out_channels, cached=True,
-                             normalize=not args.use_gdc)
-
-    def forward(self, x, edge_index, edge_weight=None):
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.conv1(x, edge_index, edge_weight).relu()
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.conv2(x, edge_index, edge_weight)
-        return x
+# class GCN(torch.nn.Module):
+#     def __init__(self, in_channels, hidden_channels, out_channels):
+#         super().__init__()
+#         self.conv1 = GCNConv(in_channels, hidden_channels, cached=True,
+#                              normalize=not args.use_gdc)
+#         self.conv2 = GCNConv(hidden_channels, out_channels, cached=True,
+#                              normalize=not args.use_gdc)
+#
+#     def forward(self, x, edge_index, edge_weight=None):
+#         x = F.dropout(x, p=0.5, training=self.training)
+#         x = self.conv1(x, edge_index, edge_weight).relu()
+#         x = F.dropout(x, p=0.5, training=self.training)
+#         x = self.conv2(x, edge_index, edge_weight)
+#         return x
 
 
 
@@ -259,6 +262,6 @@ def main():
      # Save the model checkpoint
     torch.save(model.state_dict(), args.model_final_path+'/model_pruned_Conv1Sp_{}_Conv2Sp_{}_ACC_{}.ckpt'.format(args.sparsity_type, args.conv1linweight, \
                              test_acc))
-        
+
 if __name__ == '__main__':
     main()

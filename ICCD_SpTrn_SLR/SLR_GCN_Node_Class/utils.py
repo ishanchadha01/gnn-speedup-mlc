@@ -3,6 +3,8 @@ import torch
 import logging
 import os
 import os.path as osp
+import numpy as np
+import dgl
 def parse_gpus(gpus):
     if gpus == 'all':
         return list(range(torch.cuda.device_count()))
@@ -26,6 +28,17 @@ def parse_args_dense():
 
     parser.add_argument('--model-name', default='Cora_dense', help='Stored model name')
     parser.add_argument('--log-name', default='Cora_dense_train', help='Log file name')
+
+    # For pretraining on pubmed dataset
+    parser.add_argument("--pretrain_dpath", type=str, default="./data/pretraining/")
+    parser.add_argument(
+        "--pretrain_graph_save_path", type=str, default="./data/pretraining/"
+    )
+    parser.add_argument(
+        "--pretrain_mordred_save_path", type=str, default="./data/pretraining/"
+    )
+
+    parser.add_argument("--pca_dim", type=int)
 
     args = parser.parse_args()
     # Dataset directory
@@ -86,7 +99,18 @@ def parse_args_admm():
     parser.add_argument('--optimization', default='savlr', help='Optimization method name')
     parser.add_argument('--check-hardprune-acc', dest='check_acc', action='store_true',
                   help='Evaluate model at reweighted training')
-    parser.add_argument('--seed', default='0', help='Set random seed for Reproducibility')      
+    parser.add_argument('--seed', default='0', help='Set random seed for Reproducibility')
+
+    parser.add_argument("--pretrain_dpath", type=str, default="./data/pretraining/")
+    parser.add_argument(
+        "--pretrain_graph_save_path", type=str, default="./data/pretraining/"
+    )
+    parser.add_argument(
+        "--pretrain_mordred_save_path", type=str, default="./data/pretraining/"
+    )
+
+    parser.add_argument("--pca_dim", type=int)
+
     args = parser.parse_args()
     args.dataset_dir = args.running_dir + '/dataset/' 
     args.model_path = args.running_dir + '/models/' + args.dataset + '/'
@@ -195,3 +219,13 @@ def get_logger(file_path):
     logger.setLevel(logging.INFO)
 
     return logger
+
+def collate_graphs_pretraining(batch):
+    gs, n_nodes, mordreds = map(list, zip(*batch))
+
+    gs = dgl.batch(gs)
+
+    n_nodes = torch.LongTensor(np.hstack(n_nodes))
+    mordreds = torch.FloatTensor(np.vstack(mordreds))
+
+    return gs, n_nodes, mordreds
