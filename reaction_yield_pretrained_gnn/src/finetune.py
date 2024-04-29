@@ -8,11 +8,15 @@ from scipy import stats
 from src.model import reactionMPNN, training, inference
 from src.dataset import GraphDataset
 from src.util import collate_reaction_graphs
+import torch
 
 # data_id -> #data_id 1: Buchwald-Hartwig, #data_id 2: Suzuki-Miyaura, %data_id 3: out-of-sample test splits for Buchwald-Hartwig
 # split_id -> #data_id 1 & 2: 0-9, data_id 3: 1-4
 # train_size -> data_id 1: [2767, 1977, 1186, 791, 395, 197, 98], data_id 2: [4032, 2880, 1728, 1152, 576, 288, 144], data_id 3: [3057, 3055, 3058, 3055]
 
+device = 'cpu'
+if torch.cuda.is_available():
+    device = 'cuda'
 
 def finetune(args):
     if args.data_id == 1:
@@ -77,7 +81,7 @@ def finetune(args):
 
     pretrained_model_path = "./model/pretrained/" + "%d_pretrained_gnn.pt" % (args.seed)
 
-    net = reactionMPNN(node_dim, edge_dim, pretrained_model_path).cuda()
+    net = reactionMPNN(node_dim, edge_dim, pretrained_model_path).to(device)
 
     if use_saved == False:
         print("-- TRAINING")

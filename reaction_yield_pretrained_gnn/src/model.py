@@ -10,6 +10,9 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from src.util import MC_dropout
 
+device = 'cpu'
+if torch.cuda.is_available():
+    device = 'cuda'
 
 class linear_head(nn.Module):
     def __init__(self, in_feats, out_feats):
@@ -117,7 +120,7 @@ class reactionMPNN(nn.Module):
         self.mpnn = GIN(node_in_feats, edge_in_feats)
         state_dict = torch.load(
             pretrained_model_path,
-            map_location="cuda:0",
+            map_location=torch.device(device),
         )
         self.mpnn.load_my_state_dict(state_dict)
         print("Successfully loaded pretrained model!")
@@ -151,7 +154,7 @@ def training(
     model_path,
     val_monitor_epoch=400,
     n_forward_pass=5,
-    cuda=torch.device("cuda:0"),
+    cuda=torch.device(device),
 ):
     train_size = train_loader.dataset.__len__()
     batch_size = train_loader.batch_size

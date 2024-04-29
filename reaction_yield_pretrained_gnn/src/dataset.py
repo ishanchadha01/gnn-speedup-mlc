@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-# from dgl.convert import graph
+from dgl.convert import graph
 
 
 class GraphDataset:

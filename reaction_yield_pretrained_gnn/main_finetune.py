@@ -25,9 +25,9 @@ if __name__ == "__main__":
     # split_id -> #data_id 1 & 2: 0-9, data_id 3: 1-4
     # train_size -> data_id 1: [2767, 1977, 1186, 791, 395, 197, 98], data_id 2: [4032, 2880, 1728, 1152, 576, 288, 144], data_id 3: [3057, 3055, 3058, 3055]
 
-    arg_parser.add_argument("--data_id", type=int)
-    arg_parser.add_argument("--split_id", type=int)
-    arg_parser.add_argument("--train_size_id", type=int)
+    arg_parser.add_argument("--data_id", type=int, default=1)
+    arg_parser.add_argument("--split_id", type=int, default=0)
+    arg_parser.add_argument("--train_size_id", type=int, default=1)
     arg_parser.add_argument("--seed", type=int, default=27407)
 
     args = arg_parser.parse_args()
