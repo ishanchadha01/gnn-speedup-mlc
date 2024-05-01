@@ -8,6 +8,8 @@ from mordred import Calculator, descriptors
 import warnings
 from tqdm import tqdm
 from multiprocessing import Pool
+import json
+from itertools import islice
 
 from utils import add_mol
 
@@ -34,7 +36,7 @@ def preprocess_mol(mol):
     return mol
 
 
-def preprocess(molsuppl, graph_save_path="../../data", num_processes=32):
+def preprocess(molsuppl, graph_save_path="../../data_1m", num_processes=2):
     length = len(molsuppl)
 
     mol_dict = {
@@ -79,8 +81,7 @@ def preprocess(molsuppl, graph_save_path="../../data", num_processes=32):
     with Pool(num_processes) as pool:
         results = list(tqdm(pool.imap(preprocess_mol, molsuppl), total=len(molsuppl)))
 
-    mol_dict = {}
-    for mol in filter(None, results):  # Filter out None results (failed molecules)
+    for mol in tqdm(filter(None, results)):  # Filter out None results (failed molecules)
         mol_dict = add_mol(mol_dict, mol)
 
     mol_dict["n_node"] = np.array(mol_dict["n_node"]).astype(int)
@@ -121,31 +122,48 @@ def get_mordred_mol(mol):
     except:
         return None
 
-
-def get_mordred(molsuppl, mordred_save_path="../../data", num_processes=32):
-    
-    calc = Calculator(descriptors, ignore_3D=True)
-
-    mol_list = []
-
-    print("Creating mordred")
-    pool = Pool(num_processes)
-    mol_list = list(tqdm(pool.imap(get_mordred_mol, molsuppl), total=len(molsuppl)))
+def process_batch(batch, calc):
+    mol_list = [get_mordred_mol(mol) for mol in batch]
     mol_list = [mol for mol in mol_list if mol is not None]
+    if mol_list:
+        return calc.pandas(mol_list, nproc=1).fill_missing(np.nan).to_numpy(dtype=float)
+    else:
+        return []
 
-    # For multi-processing, the number of threads should be limited before running the program.
-    # export OMP_NUM_THREADS=2
-    # export MKL_NUM_THREADS=2
-    # export MKL_THREADING_LAYER=SEQUENTIAL
-    # export NUMEXPR_NUM_THREADS=2
+def get_mordred(molsuppl, mordred_save_path="../../data_1m", num_processes=64, batch_size=100_000):
+    calc = Calculator(descriptors, ignore_3D=True)
+    num_mols = len(molsuppl)
+    pool = Pool(num_processes)
     
-    mordred_list = calc.pandas(mol_list).fill_missing(np.nan).to_numpy(dtype=float)
+    for i in tqdm(range(0, num_mols, batch_size)):
+        batch = list(islice(molsuppl, i, min(i + batch_size, num_mols)))
+        results = pool.apply_async(process_batch, (batch, calc))
+        
+        mordred_batch = results.get()
+        if mordred_batch:
+            with open(os.path.join(mordred_save_path, f"pubchem_mordred_{i//batch_size}.npz"), "wb") as f:
+                pickle.dump([mordred_batch], f, protocol=5)
 
-    with open(
-        os.path.join(mordred_save_path, "pubchem_mordred.npz"),
-        "wb",
-    ) as f:
-        pickle.dump([mordred_list], f, protocol=5)
+
+# def get_mordred(molsuppl, mordred_save_path="../../data_1m", num_processes=256):
+    
+#     calc = Calculator(descriptors, ignore_3D=True)
+
+#     mol_list = []
+
+#     print("Creating mordred")
+#     pool = Pool(num_processes)
+#     mol_list = list(tqdm(pool.imap(get_mordred_mol, molsuppl), total=len(molsuppl)))
+#     mol_list = [mol for mol in mol_list if mol is not None]
+#     mordred_list = calc.pandas(mol_list).fill_missing(np.nan).to_numpy(dtype=float)
+
+#     with open(
+#         os.path.join(mordred_save_path, "pubchem_mordred.npz"),
+#         "wb",
+#     ) as f:
+#         pickle.dump([mordred_list], f, protocol=5)
+
+    
 
 
 if __name__ == "__main__":
@@ -160,11 +178,11 @@ if __name__ == "__main__":
     # The full dataset (10M mols collected from Pubchem) can be downloaded from
     # https://arxiv.org/pdf/2010.09885.pdf
     molsuppl = Chem.SmilesMolSupplier(
-        "../../data/pubchem-10m.txt", delimiter=","
+        "../../data_1m/pubchem-1m.txt", delimiter=","
     )
 
-    if not os.path.exists("../../data/pubchem_graph.npz"):
+    if not os.path.exists("../../data_1m/pubchem_graph.npz"):
         preprocess(molsuppl)
 
-    if not os.path.exists("../../datapubchem_mordred.npz"):
+    if not os.path.exists("../../data_1m/pubchem_mordred.npz"):
         get_mordred(molsuppl)

@@ -12,6 +12,7 @@ from train_test_baselines import train_baselines, test_baselines
 from train_test import train, test
 from logger import Logger
 from train_utils import *
+from tqdm import tqdm
 
 
 def main():
@@ -88,11 +89,13 @@ def main():
     device = torch.device(args.device if args.device >= 0 else 'cpu')
 
     # load dataset
+    print("Loading dataset")
     dataset = PygNodePropPredDataset(name='ogbn-{}'.format(args.dataset),
                                      transform=T.ToSparseTensor(), root="../dataset")
     num_features = dataset[0].num_features
 
     # dataloader
+    print("Creating dataloader")
     if run_baselines:
         train_loader = get_baseline_dataloader(dataset, args.sampling, args.sampling_type,
                                                args.sampling_ratio, args.num_layers, args.num_workers)
@@ -104,6 +107,7 @@ def main():
         test_loader = get_test_dataloader(dataset)
 
     # load model
+    print("Loading model")
     if args.model == 'Sketch-GCN':
         model = SketchGCN(num_features, args.hidden_channels, dataset.num_classes,
                           args.num_layers, args.batchnorm, args.dropout, args.order)
@@ -117,12 +121,15 @@ def main():
         raise NotImplementedError
 
     # evaluator
+    print("Creating evaluator")
     evaluator = Evaluator(name='ogbn-{}'.format(args.dataset))
 
     # logger
+    print("Creating logger")
     logger = Logger(args.runs, args)
 
     # optimizer
+    print("Creating optimizer")
     model.reset_parameters()
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
@@ -138,7 +145,8 @@ def main():
     model_memory_usage = torch.cuda.memory_allocated(device)
 
     # train entrance
-    for run in range(args.runs):
+    print(f"Starting training for {args.runs} runs with {args.num_epochs} epochs in each run")
+    for run in tqdm(range(args.runs)):
         # reset model
         model.reset_parameters()
 

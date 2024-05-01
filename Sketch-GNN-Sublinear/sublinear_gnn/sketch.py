@@ -77,6 +77,8 @@ DEFAULT_COUNT_SKETCH_CONFIG = SketchConfig(
     dense_GPU=Backends.PYG_SPARSE,
     sparse_CPU=Backends.PYG_SPARSE,
     sparse_GPU=Backends.PYTORCH_SPARSE,
+    # output_type=OutputTypes.PYG_SPARSE
+
     output_type=OutputTypes.PYTORCH_TENSOR
 )
 
@@ -278,6 +280,7 @@ class TensorSketch(AbstractSketch):
                 else:
                     raise NotImplementedError
             else:
+                # Perform for sparse tensor
                 raise NotImplementedError
 
     def unsketch_mat(self, x):

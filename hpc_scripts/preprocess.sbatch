@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH -J mlc-gnn-preprocess                                                # Job name
 #SBATCH --account=gts-ychen3538                                 # Tracking account
-#SBATCH -N 8 --ntasks-per-node 8                             # Number of nodes and cores per node required
-#SBATCH -t720                                                   # Duration of the job (Ex: 15 mins)
+#SBATCH -N 1 --ntasks-per-node 8                             # Number of nodes and cores per node required
+#SBATCH --mem-per-cpu=64G
+#SBATCH -t2400                                                  # Duration of the job (Ex: 15 mins)
 #SBATCH -qinferno                                               # QOS Name
-#SBATCH -o preprocess_mlc_gnn_10m.out                                   # Combined output and error messages file
+#SBATCH -o preprocess_mlc_gnn_1m.out                                   # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL                              # Mail preferences
 #SBATCH --mail-user=ichadha3@gatech.edu                         # E-mail address for notifications
 
