@@ -339,18 +339,22 @@ def sketch_node_feature_matrix(node_feature_mat, count_sketch_list):
     return [cs(node_feature_mat).cpu() for cs in count_sketch_list]
 
 
-def preprocess_data(n_layers, in_dim, out_dim, order, top_k, mode, nf_mat, conv_mat, device=torch.device('cpu'),
+def preprocess_data(n_layers, in_dim, in_edge_dim, out_dim, order, top_k, mode, nf_mat, ef_mat, conv_mat, device=torch.device('cpu'),
                     count_sketch_config=DEFAULT_COUNT_SKETCH_CONFIG, tensor_sketch_config=DEFAULT_TENSOR_SKETCH_CONFIG):
     conv_mat = conv_mat.to(device)
     nf_mat = nf_mat.to(device)
-    all_sketch_modules = initialize_sketch_modules(n_layers, in_dim, out_dim, order, mode, device,
+    ef_mat = ef_mat.to(device)
+    all_node_sketch_modules = initialize_sketch_modules(n_layers, in_dim, out_dim, order, mode, device,
+                                                   count_sketch_config, tensor_sketch_config)
+    all_edge_sketch_modules = initialize_sketch_modules(n_layers, in_edge_dim, out_dim, order, mode, device,
                                                    count_sketch_config, tensor_sketch_config)
     conv_sketches = [sketch_convolution_matrix(conv_mat,
-                                               count_sketch_list=all_sketch_modules[l + 1][0],
-                                               tensor_sketch=all_sketch_modules[l][1],
+                                               count_sketch_list=all_node_sketch_modules[l + 1][0],
+                                               tensor_sketch=all_node_sketch_modules[l][1],
                                                top_k=top_k)
                      for l in range(n_layers)]
-    nf_sketches = sketch_node_feature_matrix(nf_mat, count_sketch_list=all_sketch_modules[0][0])
-    ll_cs_list = [count_sketch.clear_cache() for count_sketch in all_sketch_modules[-1][0].cpu()]
-    return nf_sketches, conv_sketches, ll_cs_list
+    nf_sketches = sketch_node_feature_matrix(nf_mat, count_sketch_list=all_node_sketch_modules[0][0])
+    ef_sketches = sketch_node_feature_matrix(ef_mat, count_sketch_list=all_edge_sketch_modules[0][0])
+    ll_cs_list = [count_sketch.clear_cache() for count_sketch in all_node_sketch_modules[-1][0].cpu()]
+    return nf_sketches, ef_sketches, conv_sketches, ll_cs_list
 

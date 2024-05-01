@@ -19,10 +19,10 @@ if __name__ == "__main__":
 
     arg_parser.add_argument("--pretrain_dpath", type=str, default="./data/pretraining/")
     arg_parser.add_argument(
-        "--pretrain_graph_save_path", type=str, default="./data/pretraining/"
+        "--pretrain_graph_save_path", type=str, default="../../data/"
     )
     arg_parser.add_argument(
-        "--pretrain_mordred_save_path", type=str, default="./data/pretraining/"
+        "--pretrain_mordred_save_path", type=str, default="../../data/"
     )
 
     arg_parser.add_argument("--pca_dim", type=int)

@@ -17,6 +17,17 @@ device = 'cpu'
 if torch.cuda.is_available():
     device = 'cuda'
 
+
+class Edge2Node(nn.Module):
+    """Converts ef mat to nf mat shape"""
+    def __init__(self, input_dim=8, output_dim=155):
+        super(Edge2Node, self).__init__()
+        self.reducer = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        return self.reducer(x)
+
+
 class linear_head(nn.Module):
     def __init__(self, in_feats, out_feats):
         super(linear_head, self).__init__()
@@ -37,6 +48,7 @@ class SketchGINConv(nn.Module):
         self.weight = Parameter(torch.empty((in_channels, out_channels), dtype=torch.float32), requires_grad=True)
         self.bias = Parameter(torch.empty(out_channels, dtype=torch.float32), requires_grad=True)
         self.coeffs = Parameter(torch.empty(order, dtype=torch.float32), requires_grad=True)
+        self.ef_nf_converter = Edge2Node()
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -48,6 +60,7 @@ class SketchGINConv(nn.Module):
         self.coeffs.data[0] = 1.0
 
     def forward(self, nf_mats, ef_mats, conv_mats):
+        ef_mats = [self.ef_nf_converter(ef_mat) for ef_mat in ef_mats]
         if self.training:
             zs = [torch.fft.rfft((nf_mats[0] + ef_mats[0]) @ self.weight + self.bias, dim=0)]
             for degree in range(2, self.order + 1):
@@ -72,9 +85,10 @@ class SketchGIN(nn.Module):
         dropout=0,
         order=2,
         depth=3,
-        node_hid_feats=300
+        # node_hid_feats=300
     ):
         super(SketchGIN, self).__init__()
+        node_hid_feats = node_in_feats
         self.order = order
         self.convs = torch.nn.ModuleList()
         self.convs.append(SketchGINConv(node_in_feats, node_hid_feats, order))

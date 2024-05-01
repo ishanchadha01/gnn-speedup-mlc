@@ -2,6 +2,7 @@ import time
 import numpy as np
 import torch
 import math
+import os
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from torch.optim import Adam
@@ -20,26 +21,31 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
-
+def collate_fn(batch):
+    assert len(batch) == 1
+    return batch[0]
 
 device = 'cpu'
 if torch.cuda.is_available():
     device = 'cuda'
 
 def pretrain(args):
+    torch_dataset = Torch_Pretraining_Dataset(args.pretrain_graph_save_path, args.pretrain_mordred_save_path, args.pca_dim)
     pretraining_dataset = Sketch_Pretraining_Dataset(
-        args.pretrain_graph_save_path, args.pretrain_mordred_save_path, args.pca_dim
+        torch_dataset, args.compress_ratio, args.num_layers, args.order, args.top_k, args.mode, args.num_sketches
     )
 
     train_loader = DataLoader(
         dataset=pretraining_dataset,
         batch_size=1,
-        shuffle=False
+        shuffle=False,
+        collate_fn=collate_fn
     )
 
     node_dim = pretraining_dataset.pyg_dataset[0].x.shape[1]
     # edge_dim = pretraining_dataset.edge_attr.shape[1]
-    mordred_dim = pretraining_dataset.pyg_dataset[0].y.shape[1]
+    mordred_dim = pretraining_dataset.pyg_dataset[0].y.shape[0]
+    print(f"Node dim {node_dim}, mordred dim {mordred_dim}")
 
     # g_encoder = SketchGIN(node_dim, edge_dim).to(device)
     g_encoder = SketchGIN(node_in_feats=node_dim, out_channels=1024)
@@ -48,7 +54,7 @@ def pretrain(args):
     # optimizer = Adam(g_encoder.parameters(),lr=args.lr,weight_decay=args.l2)
     mask = None
 
-    pc_eigenvalue = pretraining_dataset.pc_eigenvalue
+    pc_eigenvalue = pretraining_dataset.pyg_dataset.pc_eigenvalue
 
     pretrain_moldescpred(args, g_encoder, m_predictor, train_loader, pc_eigenvalue, args.seed, mask)
 
@@ -106,10 +112,10 @@ def pretrain_moldescpred(
         ):
             # inputs, n_nodes, mordred = batchdata
             nf_sketches, ef_sketches, conv_sketches, ll_cs_list, label = batchdata
-            nf_sketches = nf_sketches.to(device)
-            ef_sketches = ef_sketches.to(device)
-            conv_sketches = conv_sketches.to(device)
-            ll_cs_list = ll_cs_list.to(device)
+            # nf_sketches = nf_sketches.to(device)
+            # ef_sketches = ef_sketches.to(device)
+            # conv_sketches = conv_sketches.to(device)
+            # ll_cs_list = ll_cs_list.to(device)
             label = label.to(device)
 
             # inputs = inputs.to(device)
@@ -129,7 +135,11 @@ def pretrain_moldescpred(
             out = torch.median(torch.stack(outs, dim=0), dim=0).values
             # out = out[train_idx] #TODO: train/test split with train idx
             # loss = F.nll_loss(out, label.squeeze(1)[train_idx])
-            loss = F.nll_loss(out, label.squeeze(1))
+            out = m_predictor(out)
+            out = torch.mean(out, dim=0)
+
+            # loss = F.nll_loss(out.to(dtype=torch.float32), label.to(dtype=torch.float32))
+            loss = weighted_mse_loss(out, label, pc_eigenvalue)
             loss.backward()
 
             optimizer.step()
@@ -268,8 +278,8 @@ class Torch_Pretraining_Dataset(GraphDataset):
     #     mordred = self.mordred[idx].astype(float)
 
     #     return g, n_node, mordred
-    def __getitem__(self, idx):
-        return self.get(idx)
+    # def __getitem__(self, idx):
+    #     return self.get(idx)
     
     def get(self, idx):
         node_feats = torch.from_numpy(
@@ -288,6 +298,7 @@ class Torch_Pretraining_Dataset(GraphDataset):
 
     def __len__(self):
         return self.n_node.shape[0]
+        # return 100 # temp for debugging
     
     def len(self):
         return self.__len__()
@@ -296,6 +307,7 @@ class Torch_Pretraining_Dataset(GraphDataset):
 class Sketch_Pretraining_Dataset(Dataset):
     def __init__(self, torch_dataset, compress_ratio, num_layers, order, top_k, mode, num_sketches):
         super(Sketch_Pretraining_Dataset, self).__init__()
+        # self.pyg_dataset = torch_dataset[:100] # temp for debugging
         self.pyg_dataset = torch_dataset
         self.compress_ratio = compress_ratio
         self.num_layers = num_layers
@@ -336,7 +348,7 @@ class Sketch_Pretraining_Dataset(Dataset):
             nf_mat = F.batch_norm(nf_mat, running_mean=None, running_var=None, training=True)
             ef_mat = F.batch_norm(ef_mat, running_mean=None, running_var=None, training=True)
 
-            self.data_list.append((nf_mat, ef_mat, conv_mat, label))
+            # self.data_list.append((nf_mat, ef_mat, conv_mat, label))
 
             self.nf_sketches.append([])
             self.ef_sketches.append([])
@@ -344,12 +356,13 @@ class Sketch_Pretraining_Dataset(Dataset):
             self.ll_cs_list.append([])
             top_k = min(self.top_k, conv_mat.size(0)-4) # If too small, dont need to sparsify anyways. -4 is a arbitrary setting though
             for _ in range(self.num_sketches):
-                nf_sketches, conv_sketches, ll_cs_list = preprocess_data(
-                    self.num_layers, in_dim=nf_mat.size(0),
+                nf_sketches, ef_sketches, conv_sketches, ll_cs_list = preprocess_data(
+                    self.num_layers, in_dim=nf_mat.size(0), in_edge_dim=ef_mat.size(0),
                     out_dim=math.ceil(nf_mat.size(0) * self.compress_ratio), order=self.order, top_k=top_k,
-                    mode=self.mode, nf_mat=nf_mat, conv_mat=conv_mat,
+                    mode=self.mode, nf_mat=nf_mat, ef_mat=ef_mat, conv_mat=conv_mat,
                 )
                 self.nf_sketches[-1].append(nf_sketches)
+                self.ef_sketches[-1].append(ef_sketches)
                 self.conv_sketches[-1].append(conv_sketches)
                 self.ll_cs_list[-1].append(ll_cs_list)
             self.labels.append(label)

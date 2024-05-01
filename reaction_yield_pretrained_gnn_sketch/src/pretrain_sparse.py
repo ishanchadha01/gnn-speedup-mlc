@@ -42,7 +42,7 @@ def pretrain(args):
 
     optimizer = Adam(g_encoder.parameters(),lr=args.lr,weight_decay=args.l2)
     mask = None
-    # args.sparse = False
+    args.sparse = False
     if args.sparse:
         decay = CosineDecay(args.death_rate, len(train_loader)*(args.epochs*args.multiplier))
         print("length of train_loader: ", len(train_loader))

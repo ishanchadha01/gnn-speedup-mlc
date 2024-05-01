@@ -16,10 +16,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--pretrain_dpath", type=str, default="./data/pretraining/")
     parser.add_argument(
-        "--pretrain_graph_save_path", type=str, default="../../data_pre"
+        "--pretrain_graph_save_path", type=str, default="../../data"
     )
     parser.add_argument(
-        "--pretrain_mordred_save_path", type=str, default="../../data_pre"
+        "--pretrain_mordred_save_path", type=str, default="../../data"
     )
 
     parser.add_argument("--pca_dim", type=int)
@@ -55,7 +55,7 @@ if __name__ == "__main__":
                         help='Order of (approximated) polynomial activation.')
     parser.add_argument('--top_k', type=int, default=8, choices=range(1, 17),
                         help='Top number of entries per row to preserve in the sketched convolution matrices.')
-    parser.add_argument('--sketch_mode', type=str, default='all_same',
+    parser.add_argument('--mode', type=str, default='all_same', # sketching mode
                         choices=['all_distinct', 'layer_distinct', 'order_distinct', 'all_same'],
                         help='How are the different sketch modules different with respect to each others.')
     parser.add_argument('--lr', type=float, default=1e-3, choices=[1e-1, 1e-2, 3e-3, 1e-3, 3e-4, 1e-4],
